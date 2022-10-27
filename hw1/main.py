@@ -146,6 +146,7 @@ if __name__ == "__main__":
 
     # Display and save output image
     cv2.imshow(out_win_name, out_image)
+    cv2.resizeWindow(out_win_name, disp_height*out_width//out_height, disp_height)
     cv2.waitKey(0)
     cv2.imwrite(args.output, out_image)
 
