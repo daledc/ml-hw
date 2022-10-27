@@ -53,9 +53,9 @@ def compute_projection_matrix(in_points, args):
                                 by double clicking on each desired corner."
     h, w = get_rectangle_size(np.vstack(in_points))
     output_points = np.array([[0, 0, 1],
-                              [w, 0, 1],
-                              [w, h, 1],
-                              [0, h, 1]], dtype=np.float32)
+                              [w-1, 0, 1],
+                              [w-1, h-1, 1],
+                              [0, h-1, 1]], dtype=np.float32)
     P, res, rnk, s = np.linalg.lstsq(in_points, output_points, rcond=None)
     return P
 
