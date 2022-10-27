@@ -1,14 +1,32 @@
 # Program Usage
-Running the program:
+## Program Requirements
+The program minimum requirements are: `python>=3.2`, `numpy`, and `opencv-python`.
+
+If you have `python` and `pip` installed you can run the command below:
+```
+pip install -r requirements.txt
+```
+
+The program has been tested to work on Windows 10 and PopOS (Ubuntu-based Distro) using the specific versions:
+- `python==3.8.13`
+- `numpy==1.23.4`
+- `opencv-python==4.6.0.66`
+
+
+## Running The Program
+You can run the program in the command line by specifying an input image path and output image path as below:
 ```
 python main.py -i book.jpg -o output.jpg
 ```
 
-Usage:
+Note: *Omitting the options will use the default input and output image path provided.*
+
+
+## Program Usage
 1. A window containing the input image will pop-up.
 2. Select four (4) corner points of the region to be transformed into a rectangular image by double clicking each desired corner point.
-3. Once four (4) corner points are selected, they will be connected by lines.
-4. Press the ENTER key to confirm. Otherwise, press the ESC key or the Q key to exit the program.
+3. Once four (4) corner points have been selected, the quadrilateral region to be transformed will be bounded by lines.
+4. Press the ENTER key to confirm transformation of the highlighted region. Otherwise, press the ESC key or the Q key to exit the program.
 
 
 # Background
@@ -33,11 +51,16 @@ Let the affine coordinate space of the $h$-by-$w$ output image be expressed as $
 
 $$Y = \{(x, y, 1) | x,y\in\mathbb{Z} \cap 0\leq x\lt w \cap 0\leq y\lt h \}$$
 
-We want to find an injective mapping, $A$, that maps the subspace $W$ to the space $Y$.
+We want to find a mapping, $A$, that maps the subspace $W$ to the space $Y$.
 $$A : W \to  Y $$
 
-To do this, we assume that the four (4) corner points defining $W$ maps to the corner points of the output image, $q_1,...q_4 \in Y$
+To do this, we assume that the four (4) corner points defining $W$ maps to the corner points of the output image, $q_1,...q_4 \in Y$;
 
-The projection matrix $A$ is then determined by solving the equation below.
+i.e., $q_1 = <0, 0, 1>, q_2=<w-1, 0, 1>, q_3=<w-1, h-1, 1>, and q_4=<0, h-1, 1>$
+
+For simplicity, we assume the input subspace $W$ and output space $Y$ are continuous. The projection matrix $A$ is then determined by solving the equation below.
 
 $$[p_1, p_2, p_3, p_4]^T A = [q_1, q_2, q_3, q_4]^T$$
+
+
+We then copy the pixel values in the affine image coordinates $(u,v,1) \in W$ to $\lfloor (u,v,1) \cdot A \rfloor \in Y$.
