@@ -62,4 +62,4 @@ $$[p_1, p_2, p_3, p_4]^T A = [q_1, q_2, q_3, q_4]^T$$
 The equation above can be solved using linear least squares regression. Suppose $P=[p_1, p_2, p_3, p_4]^T$, and $Q=[q_1, q_2, q_3, q_4]^T$, the value of the transformation matrix $A$ can be computed below.
 $$A = (P^T P)^{-1}P^T Q$$
 
-The image transformation can then be performed by copying the pixel values in the input image affine coordinates $[u,v,1] \in X$ to the output image affine coordinates $\lfloor [x,y,1] A \rfloor \in Y$. Note: *Instead of mapping pixel values in $W$, we map pixel values in $X$ and copy the pixel value as long as its mapped coordinate belongs to the output space $Y$.*
+The image transformation can then be performed by copying the pixel values in the input image affine coordinates $[u,v,1] \in X$ to the output image affine coordinates $\lfloor [x,y,1] A \rfloor \in Y$. Note: *Instead of mapping pixel values in $$W$$, we map pixel values in $$X$$ and copy the pixel value as long as its mapped coordinate belongs to the output space $$Y$$.*
