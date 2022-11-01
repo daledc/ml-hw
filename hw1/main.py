@@ -24,6 +24,7 @@ def set_points_callback(event, x, y, flags, in_points):
       flags: unused parameter required by OpenCV window callback
       in_points: list for storing image coordinates
     """
+    del flags  # Unused by set_points_callback
     if len(in_points) < 4 and event == cv2.EVENT_LBUTTONDBLCLK:
         print(f" - ({x}, {y})")
         in_points.append(np.array([x, y], np.float32))
@@ -38,12 +39,12 @@ def init_gui(in_image, in_points, args):
     in_height, in_width, _ = in_image.shape
     left_display_width = int(args.disp_height*float(in_width)/float(in_height))
     cv2.namedWindow(args.in_win_name, cv2.WINDOW_NORMAL)
-    cv2.moveWindow(args.in_win_name, args.disp_offset[0], args.disp_offset[1])
+    cv2.moveWindow(args.in_win_name, args.disp_off_horz, args.disp_off_vert)
     cv2.resizeWindow(args.in_win_name, left_display_width, args.disp_height)
     cv2.setMouseCallback(args.in_win_name, set_points_callback, in_points)
     cv2.namedWindow(args.out_win_name, cv2.WINDOW_NORMAL)
-    cv2.moveWindow(args.out_win_name, args.disp_offset[0]+left_display_width+1,
-                   args.disp_offset[1])
+    cv2.moveWindow(args.out_win_name, args.disp_off_horz+left_display_width+1,
+                   args.disp_off_vert)
 
 
 def sort_corner_points(points):
@@ -80,7 +81,7 @@ def select_corner_points(in_image, in_points, window_name):
     """ Updates the display window for the input image and handles selection
     of the corner points for computation of the projection matrix.
     Args:
-      in_points: list of corner points
+      in_points: list of points
       in_image: input image
       window_name: window to display
     """
@@ -127,8 +128,8 @@ def get_quad_size(points):
 
 
 def compute_transformation_matrix(in_points):
-    """ Computes transformation matrix from a list of input corner points and
-    a list assumed projected rectangular region corner points.
+    """ Computes transformation matrix from a list of input points and
+    a list of assumed projected rectangular region corner points.
     Args:
       in_points: list of points
 
@@ -155,10 +156,12 @@ if __name__ == "__main__":
                                         help="input image path")
     parser.add_argument("-o", "--output", default="output.jpg",
                                         help="output image path")
-    parser.add_argument("-dh", "--disp_height", default=600,
-                                        help="display height")
-    parser.add_argument("-do", "--disp_offset", default=(100, 100),
-                                        help="display offset")
+    parser.add_argument("-dh", "--disp_height", default=600, type=int,
+                  help="display height (display width is adjusted accordingly)")
+    parser.add_argument("-doh", "--disp_off_horz", default=80, type=int,
+                                        help="horizontal display offset")
+    parser.add_argument("-dov", "--disp_off_vert", default=100, type=int,
+                                        help="vertical display offset")
     parser.add_argument("--in_win_name", default="Input Image",
                                         help="input window title")
     parser.add_argument("--out_win_name", default="Output Image",
