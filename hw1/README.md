@@ -1,3 +1,4 @@
+## Table of Contents 
 - [Program Requirements](#program-requirements)
 - [Usage Example](#usage-example)
 - [Usage Instructions](#usage-instructions)
@@ -6,31 +7,35 @@
   - [Problem](#problem)
   - [Solution](#solution)
 
-## Program Requirements
-The program minimum requirements are: `python>=3.2`, `numpy`, and `opencv-python`.
 
-Assuming you have `python` and `pip` already installed, run the command below:
+## Program Requirements
+The minimum requirements to run the program are: `python>=3.2`, `numpy`, and `opencv-python`.
+
+Assuming you already have `python` and `pip` installed, you may run the command below:
 ```
 pip install -r requirements.txt
 ```
 
-The program has been tested to work on Windows 10 and PopOS (Ubuntu-based Distro) using the specific versions:
+The program has been tested to work on Windows 10 (Build 19044) and PopOS 22.04 (Ubuntu-based distribution) using the specific versions below:
 - `python==3.8.13`
 - `numpy==1.23.4`
 - `opencv-python==4.6.0.66`
 
-
 ## Usage Example
-You can run the program in the command line by specifying an input image path and output image path. An example is given below.
+You can run the program in the terminal by specifying an input image path option and output image path option. An example is given below:
 ```
 python main.py -i input.jpg -o output.jpg
 ```
-Note: *Omitting the options will use the default input and output image paths provided.*
+Note: *Omitting an option will use the default values provided.*
 
+To check other (GUI-related) options, access the program help:
+```
+python main.py --help
+```
 
 ## Usage Instructions
 1. Two display windows will popup immediately after starting the program. The left window will contain the input image while the right window will be initially empty. *You may press the ESC key or the Q key (while focused on the windows) to terminate the program at any time.*
-2. Select four (4) points of the quadrilateral region to be transformed into a rectangular image by double clicking each desired corner point. Once four (4) corner points have been selected, the quadrilateral region to be transformed will be bounded by lines. Press the ENTER key to confirm transformation of the highlighted region. 
+2. On the left window containing the input image, select four (4) points of the quadrilateral region to be transformed by double clicking each desired point. Once four (4) points have been selected, the quadrilateral region to be transformed will be shown by lines. Press the ENTER key to confirm transformation of the highlighted region. 
 3. The transformed output image will be displayed on the right window. Press any key to terminate the program.
 
 
