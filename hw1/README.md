@@ -6,7 +6,7 @@
   - [Learning Objective](#learning-objective)
   - [Problem](#problem)
   - [Solution](#solution)
-
+- [License](#license)
 
 ## Program Requirements
 The minimum requirements to run the program are: `python>=3.2`, `numpy`, and `opencv-python`.
@@ -73,3 +73,5 @@ The equation above can be solved using linear least squares regression. Suppose 
 $$A = (P^T P)^{-1}P^T Q$$
 
 The image transformation can then be performed by copying the pixel values in the input image affine coordinates $[u,v,1] \in X$ to the output image affine coordinates $\lfloor [x,y,1] A \rfloor \in Y$. Note: *Instead of mapping pixel values in* $W$*, we map pixel values in* $X$ *and copy the pixel value as long as its mapped coordinate belongs to the output space* $Y$*.*
+
+## LICENSE
