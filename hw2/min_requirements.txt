@@ -1,0 +1,5 @@
+-e git+https://github.com/geohot/tinygrad.git@4fb97b8de0e210cc37786ffdafc5dc0e990df593#egg=tinygrad
+matplotlib==3.6.2
+pandas==1.5.2
+scikit-learn==1.2.0
+tqdm==4.64.1
