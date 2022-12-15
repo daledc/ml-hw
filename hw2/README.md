@@ -6,8 +6,9 @@
   - [Objective](#objective)
   - [Problem](#usage)
 
+
 ## Program Requirements
-The minimum requirements to run the program are: `python>=3.8`, `matplotlib`, `pandas`, `scikit-learn`, `tqdm` and [`tinygrad`](https://github.com/geohot/tinygrad) (and its corresponding dependencies).
+The minimum requirements to run the program are: `python>=3.8`, [`tinygrad`](https://github.com/geohot/tinygrad),  `pandas`, `matplotlib`, and `tqdm`.
 
 Assuming you already have `python`, `pip`, and `git` installed, you may run the command below:
 ```
@@ -18,7 +19,7 @@ or
 pip install -r min_requirements.txt
 ```
 
-Note that [requirements.txt](requirements.txt) and [min_requirements.txt](min_requirements.txt) both include tinygrad. If you already have tinygrad installed from the link above, you should remove the line corresponding to tinygrad.
+Note that [requirements.txt](requirements.txt) and [min_requirements.txt](min_requirements.txt) both include tinygrad. If you already have tinygrad installed, you may remove the line corresponding to tinygrad.
 
 
 ## Usage Example
@@ -29,8 +30,9 @@ python solver.py
 
 You can also run the program in the terminal by specifying the path containing the dataset files as shown below.
 ```
-python solver.py --data sample_data
+python solver.py --data sample_data --results results
 ```
+
 
 ## Homework 2: Polynomial Solver using SGD and TinyGrad
 
