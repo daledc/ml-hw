@@ -302,6 +302,8 @@ if __name__ == "__main__":
                                     help="path to data")
     parser.add_argument("-e", "--epochs", default=100, type=int,
                                     help="maximum epochs per model")
+    parser.add_argument("-s", "--early_stop", default=20, type=int,
+                                    help="early stop parameter")
     args = parser.parse_args()
 
     # Create results path if it does not exist
@@ -319,13 +321,13 @@ if __name__ == "__main__":
     model_selector = ModelSelection(degree=0, cost=1e20)
 
     # Train polynomial models from degree 1 to degree 4
-    for degree in range(1, 5):
+    for degree in range(4, 5):
 
         # Initialize model with current degree and other training objects that
         # change based on degree
         model = PolyNet(degree)
         optimizer = SGD(model.parameters(), lr_list=lr_list[:degree+1])
-        early_stop = EarlyStopping(epochs=20)
+        early_stop = EarlyStopping(args.early_stop)
         lambda_reg = 1/degree
         input_transform = PolynomialTransform(degree)
 
@@ -350,12 +352,9 @@ if __name__ == "__main__":
                 break
 
             # Update progress bar after every epoch
-            num_epochs_pbar.set_description(f"Degree {degree}; \
-                Train Loss: \{train_loss.numpy()[0]:.4f}; \
-                Valid Loss: {valid_loss:.4f}; \
-                Coefficients: {model.coefficients()}")
+            num_epochs_pbar.set_description(f"Degree {degree}; Train Loss: {train_loss.numpy()[0]:.4f}; Valid Loss: {valid_loss:.4f}; Coefficients: {model.coefficients()}")
 
-        # Model selection cost is set to loss and penalizes a leading coefficient close to 0.
+        # Perform model selection based on a specified model cost
         model_cost = valid_loss + 1/abs(early_stop.best_coefficients[-1])
         model_selector.update(model, model_cost, early_stop.best_coefficients)
 
