@@ -321,7 +321,7 @@ if __name__ == "__main__":
     model_selector = ModelSelection(degree=0, cost=1e20)
 
     # Train polynomial models from degree 1 to degree 4
-    for degree in range(4, 5):
+    for degree in range(0, 5):
 
         # Initialize model with current degree and other training objects that
         # change based on degree
