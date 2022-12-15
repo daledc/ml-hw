@@ -8,13 +8,13 @@ import os
 import argparse
 import numpy as np
 np.set_printoptions(precision=2, suppress=True)
+rng = np.random.default_rng()
 import pandas as pd
 from tinygrad.tensor import Tensor
 import tinygrad.nn.optim as optim
 from tqdm import tqdm
 from numpy.polynomial.polynomial import polyfit
 import matplotlib.pyplot as plt
-
 
 
 
@@ -26,6 +26,16 @@ def load_dataset(path, x_name="x", y_name="y"):
     X = data.get(x_name).values.reshape(-1, 1)
     Y = data.get(y_name).values.reshape(-1, 1)
     return X, Y
+
+
+def sort_dataset(X, Y):
+    """
+    Sorts X and Y simultaneously in ascending order based on values of X.
+    """
+    perm_index = X.flatten().argsort()
+    X_sort = X[perm_index]
+    Y_sort = Y[perm_index]
+    return X_sort, Y_sort
 
 
 class DataLoader:
@@ -64,30 +74,29 @@ class DataLoader:
         self.Y = self.Y[perm_index]
 
 
-def split_dataset(X, Y):
+def generate_training_dataloaders(X, Y, bs=128, input_transform=None, size=3200):
     """
-    Performs data augmentation and generates training and validation splits.
+    Performs data augmentation on provided training set (X, Y) and generates
+    random training and validation splits.
     """
-    # Sort input dataset based on X
-    perm_index = X.flatten().argsort()
-    Y_sort = Y[perm_index]
-    X_sort = X[perm_index]
-
     # Perform data augmentation
-    X_interp = np.arange(-20, 20 + 0.025, 0.025)
-    Y_interp = np.interp(X_interp, X_sort.flatten(), Y_sort.flatten())
+    X_interp = rng.uniform(np.min(X), np.max(X), size)
+    Y_interp = np.interp(X_interp, X.flatten(), Y.flatten())
     X_aug, Y_aug = X_interp.reshape(-1, 1), Y_interp.reshape(-1, 1)
 
-    valid_splits = 5
-    parts = [np.arange(i, X_aug.shape[0],valid_splits) for i in range(valid_splits)]
-    valid_idx = 0
-    train_indices = np.sort(np.concatenate(parts[:valid_idx]+parts[valid_idx+1:]))
-    valid_indices = np.concatenate(parts[valid_idx:valid_idx+1])
+    # Generate training and validation splits
+    indices = np.arange(0, X_aug.shape[0])
+    np.random.shuffle(indices)
+    train_indices = indices[:int(0.8*size)]
+    valid_indices = indices[int(0.8*size):]
     X_train = X_aug[train_indices]
     Y_train = Y_aug[train_indices]
     X_valid = X_aug[valid_indices]
     Y_valid = Y_aug[valid_indices]
-    return X_train, Y_train, X_valid, Y_valid
+
+    # Return dataloaders corresponding to the splits
+    return (DataLoader(X_train, Y_train, bs, input_transform), 
+            DataLoader(X_valid, Y_valid, bs, input_transform))
 
 
 def TensorListToTensor(tensor_list):
@@ -174,13 +183,16 @@ class PolynomialTransform:
         return out
 
 
-class EarlyStopping:
+class ExponentialScheduler:
     """
-    Tracks the model validation loss to perform early stopping. The model
-    weights corresponding to the lowest validation loss is stored.
+    Tracks the best model validation loss and exponentially updates the learning
+    rate of the provided optimizer. The model weights corresponding to the
+    lowest validation loss is stored for model evaluation.
     """
-    def __init__(self, epochs=5, min_loss=1e20):
-        self.stop_epoch = epochs
+    def __init__(self, optimizer, scaler, min_loss=1e20):
+        self.optimizer = optimizer
+        self.epoch = 0
+        self.scaler = scaler
         self.min_loss = min_loss
         self.epochs_since_min = 0
         self.best_coefficients = None
@@ -191,13 +203,11 @@ class EarlyStopping:
             self.epochs_since_min = 0
             if model is not None:
                 self.best_coefficients = model.coefficients()
-        else:
-            self.epochs_since_min += 1
 
-    def stop(self):
-        if self.epochs_since_min >= self.stop_epoch:
-            return True
-        return False
+        new_lr_list = []
+        for lr in optimizer.lr_list:
+            new_lr_list.append(lr*self.scaler)
+        optimizer.lr_list = new_lr_list
 
 
 class ModelSelection:
@@ -276,7 +286,6 @@ def visualize_results(model, input_transform, X, Y, split, result_path, npts=100
                                         f'model_fit_{split.lower()}.png'))
     plt.show()
 
-
 def generate_predictions(model, input_transform, X, split, result_path, save=True):
     """
     Generates the prediction results of the model on the input data X.
@@ -288,7 +297,6 @@ def generate_predictions(model, input_transform, X, split, result_path, save=Tru
         preds.to_csv(os.path.join(result_path, f"predictions_{split.lower()}.csv"),
                                     index = False)
     return Ypred
-
 
 
 
@@ -312,7 +320,7 @@ if __name__ == "__main__":
 
     # Load dataset
     X, Y = load_dataset(os.path.join(args.data, "data_train.csv"))
-    X_train, Y_train, X_valid, Y_valid = split_dataset(X, Y)
+    X, Y = sort_dataset(X, Y)
     X_test, Y_test = load_dataset(os.path.join(args.data, "data_test.csv"))
 
     # Initialize parameters that do not need to be updated for each model degree
@@ -321,24 +329,21 @@ if __name__ == "__main__":
     model_selector = ModelSelection(degree=0, cost=1e20)
 
     # Train polynomial models from degree 1 to degree 4
-    for degree in range(0, 5):
+    for degree in range(1, 5):
 
-        # Initialize model with current degree and other training objects that
-        # change based on degree
+        # Initialize model training objects that change based on degree
         model = PolyNet(degree)
         optimizer = SGD(model.parameters(), lr_list=lr_list[:degree+1])
-        early_stop = EarlyStopping(args.early_stop)
+        scheduler = ExponentialScheduler(optimizer, 0.1**(1/args.epochs))
         lambda_reg = 1/degree
         input_transform = PolynomialTransform(degree)
 
         # Train current polynomial model with current degree
-        train_dataloader = DataLoader(X_train, Y_train, batch_size,
-                                        input_transform, shuffle=True)
-        valid_dataloader = DataLoader(X_valid, Y_valid, batch_size,
-                                        input_transform)
-
         num_epochs_pbar = tqdm(range(args.epochs))
         for epoch in num_epochs_pbar:
+            train_dataloader, valid_dataloader = generate_training_dataloaders(
+                X, Y, batch_size, input_transform, 15*batch_size)
+
             # Training step
             model, train_loss = train_one_epoch(model, train_dataloader,
                                                         optimizer, lambda_reg)
@@ -346,17 +351,16 @@ if __name__ == "__main__":
             # Validation step
             valid_loss = evaluate_model(model, valid_dataloader)
 
-            # Update early stop Scheduler
-            early_stop.update(valid_loss, model)
-            if early_stop.stop():
-                break
+            # Update scheduler
+            scheduler.update(valid_loss, model)
 
             # Update progress bar after every epoch
             num_epochs_pbar.set_description(f"Degree {degree}; Train Loss: {train_loss.numpy()[0]:.4f}; Valid Loss: {valid_loss:.4f}; Coefficients: {model.coefficients()}")
 
         # Perform model selection based on a specified model cost
-        model_cost = valid_loss + 1/abs(early_stop.best_coefficients[-1])
-        model_selector.update(model, model_cost, early_stop.best_coefficients)
+        coefficients = scheduler.best_coefficients
+        model_cost = valid_loss + 1/abs(coefficients[-1])
+        model_selector.update(model, model_cost, coefficients)
 
     # Load and display coefficients of best model
     model = PolyNet()
