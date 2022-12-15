@@ -18,46 +18,48 @@ import matplotlib.pyplot as plt
 
 
 
-def load_dataset(path):
+def load_dataset(path, x_name="x", y_name="y"):
     """
-    Loads the dataset containing tuples.
+    Loads a csv file containing named columns into arrays X and Y.
     """
     data = pd.read_csv(path, index_col=False)
-    X = data.get("x").values.reshape(-1, 1)
-    Y = data.get("y").values.reshape(-1, 1)
+    X = data.get(x_name).values.reshape(-1, 1)
+    Y = data.get(y_name).values.reshape(-1, 1)
     return X, Y
 
 
 class DataLoader:
     """
-    Defines a dataloader for loading the dataset into minibatches.
+    Defines a dataloader for loading a dataset into minibatches.
     """
-    def __init__(self, X, Y, bs=8, input_transform=None, shuffle_data=False):
+    def __init__(self, X, Y, bs=8, input_transform=None, shuffle=False):
         assert len(X) == len(Y), ("Input and output must be of the same length.")
-        self.num_pts = len(X)
-        self.length = len(X)//bs + (0 if len(X)%bs == 0 else 1)
         self.X = X
         self.Y = Y
         self.bs = bs
         self.input_transform = input_transform
-        self.shuffle_data = shuffle_data
+        self.shuffle = shuffle
+        self.npts = len(X)
+
+    def size(self):
+        return self.npts
 
     def __iter__(self):
-        if self.shuffle_data:
-            self.shuffle()
+        if self.shuffle:
+            self.shuffle_data()
 
-        for start in range(0, self.num_pts, self.bs):
+        for start in range(0, self.size(), self.bs):
             xb = self.X[start:start+self.bs]
-            yb = self.Y[start:start+self.bs]
             if self.input_transform is not None:
                 xb = self.input_transform(xb)
+            yb = self.Y[start:start+self.bs]
             yield xb, yb
 
     def __len__(self):
-        return self.length
+        return self.size()//self.bs + (0 if self.size()%self.bs == 0 else 1)
 
-    def shuffle(self):
-        perm_index = np.random.permutation(self.num_pts)
+    def shuffle_data(self):
+        perm_index = np.random.permutation(self.size())
         self.X = self.X[perm_index]
         self.Y = self.Y[perm_index]
 
@@ -90,7 +92,7 @@ def split_dataset(X, Y):
 
 def TensorListToTensor(tensor_list):
     """
-    Convert a list of tinygrad Tensor/s to a single tinygrad Tensor.
+    Convert a list of tinygrad Tensor/s into a single tinygrad Tensor.
     """
     assert len(tensor_list) > 0, ("Cannot create empty Tensor.")
     T = tensor_list[0]
@@ -101,7 +103,7 @@ def TensorListToTensor(tensor_list):
 
 class PolyNet:
     """
-    Tinygrad model for a polynomial.
+    A polynomial model for tinygrad.
     """
     def __init__(self, degree=None):
         if degree is not None:
@@ -136,7 +138,7 @@ class PolyNet:
 
 class SGD(optim.Optimizer):
     """
-    SGD implementation of tinygrad with support for multiple learning rates
+    Modified SGD implementation of tinygrad with support for multiple learning rates
     and momentum.
     """
     def __init__(self, params, lr_list, beta=0.9):
@@ -155,9 +157,10 @@ class SGD(optim.Optimizer):
         self.realize()
 
 
-class polynomial_transform:
+class PolynomialTransform:
     """
-    Converts a list of scalars into a polynomial evaluated tingrad Tensor.
+    Extend the dimension of an array of scalars by computing the nth power of
+    each element from 0 to the specified degree in an additional axis.
     """
     def __init__(self, degree):
         assert degree > 0, "Degree must be greater than 0."
@@ -171,27 +174,15 @@ class polynomial_transform:
         return out
 
 
-class MSEloss:
-    """
-    Defines a class that computes the MSE between two tinygrad Tensors
-    """
-    def __init__(self):
-        pass
-
-    def __call__(self, y, yhat):
-        mse_loss = (yhat-y).mul(yhat-y).mean()
-        return mse_loss
-
-
 class EarlyStopping:
     """
-    Defines a class that tracks the lowest validation loss and corresponding
-    model weights; and can perform early stopping.
+    Tracks the model validation loss to perform early stopping. The model
+    weights corresponding to the lowest validation loss is stored.
     """
-    def __init__(self, epochs=5):
-        self.min_loss = 1e30
+    def __init__(self, epochs=5, min_loss=1e20):
+        self.stop_epoch = epochs
+        self.min_loss = min_loss
         self.epochs_since_min = 0
-        self.early_stop_epochs = epochs
         self.best_coefficients = None
 
     def update(self, loss, model=None):
@@ -204,22 +195,36 @@ class EarlyStopping:
             self.epochs_since_min += 1
 
     def stop(self):
-        if self.epochs_since_min >= self.early_stop_epochs:
+        if self.epochs_since_min >= self.stop_epoch:
             return True
         return False
 
 
-def evaluate_model(model, dataloader):
+class ModelSelection:
     """
-    Computes the mean square error of the model on the given dataloader.
+    Tracks the model weights of the each possible model based on a model cost.
     """
-    mse = 0.0
-    for x, y in dataloader:
-        out = model.forward(x).reshape((-1,1))
-        loss = loss_function(y, out).numpy()[0]
-        mse += loss*out.shape[0]
-    mse /= dataloader.num_pts
-    return mse
+    def __init__(self, degree=0, cost=1e20, verbose=True):
+        self.best_degree = degree
+        self.best_cost = cost
+        self.best_coefficients = []
+        self.verbose = verbose
+
+    def update(self, model, model_cost, best_coefficients):
+        if model_cost < self.best_cost:
+            self.best_cost = model_cost
+            self.best_degree = model.degree()
+            self.best_coefficients = best_coefficients
+        if self.verbose:
+            print(f"Model Cost: {model_cost:.4f}, Coefficients: {best_coefficients}")
+
+
+def MSEloss(y, yhat):
+    """
+    Computes the MSE between two tinygrad Tensors
+    """
+    mse_loss = (yhat-y).mul(yhat-y).mean()
+    return mse_loss
 
 
 def train_one_epoch(model, train_dataloader, optimizer, lambda_reg):
@@ -231,7 +236,7 @@ def train_one_epoch(model, train_dataloader, optimizer, lambda_reg):
     for x, y in train_dataloader:
         optimizer.zero_grad()
         out = model.forward(x).reshape((-1,1))
-        loss = loss_function(y, out)
+        loss = MSEloss(y, out)
         W = TensorListToTensor(model.parameters())
         reg_loss = lambda_reg * W[1:].mul(W[1:]).sqrt().sum()
         train_batch_loss = loss + reg_loss
@@ -239,13 +244,26 @@ def train_one_epoch(model, train_dataloader, optimizer, lambda_reg):
         train_batch_loss.backward()
         optimizer.step()
 
-    train_loss /= train_dataloader.num_pts
+    train_loss /= train_dataloader.size()
     return model, train_loss
+
+
+def evaluate_model(model, dataloader):
+    """
+    Computes the mean square error of the model on the given dataloader.
+    """
+    mse = 0.0
+    for x, y in dataloader:
+        out = model.forward(x).reshape((-1,1))
+        loss = MSEloss(y, out).numpy()[0]
+        mse += loss*out.shape[0]
+    mse /= dataloader.size()
+    return mse
 
 
 def visualize_results(model, input_transform, X, Y, split, result_path, npts=100, save=True):
     """
-    Plots the model polynomial against the datapoints provided.
+    Plots the model polynomial against the datapoints (X,Y) provided.
     """
     X_disp = np.linspace(np.min(X), np.max(X), npts).reshape(-1, 1)
     Y_disp = model.forward(input_transform(X_disp)).reshape(-1, 1).numpy()
@@ -261,7 +279,7 @@ def visualize_results(model, input_transform, X, Y, split, result_path, npts=100
 
 def generate_predictions(model, input_transform, X, split, result_path, save=True):
     """
-    Saves the prediction results of the model on the input data X.
+    Generates the prediction results of the model on the input data X.
     """
     Ypred = model.forward(input_transform(X)).reshape((-1,1)).numpy() 
     if save:
@@ -270,25 +288,6 @@ def generate_predictions(model, input_transform, X, split, result_path, save=Tru
         preds.to_csv(os.path.join(result_path, f"predictions_{split.lower()}.csv"),
                                     index = False)
     return Ypred
-
-
-class ModelSelection:
-    """
-    Creates an object that can track the weights of the best model based on cost.
-    """
-    def __init__(self, degree=0, cost=1e20, coeff=[]):
-        self.best_degree = degree
-        self.best_cost = cost
-        self.best_coefficients = coeff
-        self.history = {}
-    
-    def update(self, model, model_cost, best_coefficients): # TODO
-        if model_cost < self.best_cost:
-            self.best_cost = model_cost
-            self.best_degree = degree
-            self.best_coefficients = best_coefficients
-        print(f"Model Cost: {model_cost:.4f}, Coefficients: {best_coefficients}")
-        self.history[model.degree()] = [best_coefficients, model_cost]
 
 
 
@@ -317,27 +316,30 @@ if __name__ == "__main__":
     # Initialize parameters that do not need to be updated for each model degree
     batch_size = 128
     lr_list = [1e-1, 1e-3, 1e-5, 1e-7, 1e-9]
-    loss_function = MSEloss()
-    model_selector = ModelSelection(degree=0, cost=1e20, coeff=[])
+    model_selector = ModelSelection(degree=0, cost=1e20)
 
     # Train polynomial models from degree 1 to degree 4
     for degree in range(1, 5):
 
-        # Initialize model with current degree and other training objects
+        # Initialize model with current degree and other training objects that
+        # change based on degree
         model = PolyNet(degree)
         optimizer = SGD(model.parameters(), lr_list=lr_list[:degree+1])
-        early_stop = EarlyStopping(epochs=10)
-        lambda_reg = 1/(degree)
-        input_transform = polynomial_transform(degree)
+        early_stop = EarlyStopping(epochs=20)
+        lambda_reg = 1/degree
+        input_transform = PolynomialTransform(degree)
 
         # Train current polynomial model with current degree
-        train_dataloader = DataLoader(X_train, Y_train, batch_size, input_transform, shuffle_data=True)
-        valid_dataloader = DataLoader(X_valid, Y_valid, batch_size, input_transform)
+        train_dataloader = DataLoader(X_train, Y_train, batch_size,
+                                        input_transform, shuffle=True)
+        valid_dataloader = DataLoader(X_valid, Y_valid, batch_size,
+                                        input_transform)
 
         num_epochs_pbar = tqdm(range(args.epochs))
         for epoch in num_epochs_pbar:
             # Training step
-            model, train_loss = train_one_epoch(model, train_dataloader, optimizer, lambda_reg)
+            model, train_loss = train_one_epoch(model, train_dataloader,
+                                                        optimizer, lambda_reg)
 
             # Validation step
             valid_loss = evaluate_model(model, valid_dataloader)
@@ -348,7 +350,10 @@ if __name__ == "__main__":
                 break
 
             # Update progress bar after every epoch
-            num_epochs_pbar.set_description(f"Degree {degree}; Train Loss: {train_loss.numpy()[0]:.4f}; Valid Loss: {valid_loss:.4f}; Coefficients: {model.coefficients()}")
+            num_epochs_pbar.set_description(f"Degree {degree}; \
+                Train Loss: \{train_loss.numpy()[0]:.4f}; \
+                Valid Loss: {valid_loss:.4f}; \
+                Coefficients: {model.coefficients()}")
 
         # Model selection cost is set to loss and penalizes a leading coefficient close to 0.
         model_cost = valid_loss + 1/abs(early_stop.best_coefficients[-1])
@@ -356,7 +361,7 @@ if __name__ == "__main__":
 
     # Load and display coefficients of best model
     model = PolyNet()
-    input_transform = polynomial_transform(model_selector.best_degree)
+    input_transform = PolynomialTransform(model_selector.best_degree)
     model_func = np.poly1d(model_selector.best_coefficients[::-1])
     print(f"\nLearned Polynomial Model:\n{model_func}")
     with open(os.path.join(args.results, 'model.txt'),'w+') as f:
